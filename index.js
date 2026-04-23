@@ -1,9 +1,21 @@
 const { Client, IntentsBitField } = require('discord.js');
 const axios = require('axios');
 
-const client = new Client({ intents: [IntentsBitField.Flags.Guilds, IntentsBitField.Flags.GuildMessages, IntentsBitField.Flags.MessageContent] });
+const client = new Client({
+    intents: [
+        IntentsBitField.Flags.Guilds,
+        IntentsBitField.Flags.GuildMessages,
+        IntentsBitField.Flags.MessageContent,
+    ],
+});
 
 const token = process.env.token;
+
+// ─── Allowed users (you + your alt) ──────────────────────────────────────────
+const ALLOWED_USERS = new Set([
+    '1172816141832421399', // main
+    '1368245007177351300', // alt
+]);
 
 // ─── History deduplication (separate pools per command) ─────────────────────
 const recentGifsSet = new Set();        // /randomcdn pool
@@ -172,10 +184,9 @@ client.on('ready', () => {
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isChatInputCommand()) return;
 
-    // Owner-only check
-    const ownerId = '1172816141832421399';
-    if (interaction.user.id !== ownerId) {
-        return interaction.reply({ content: '🚫 This bot is private and only the owner can use it.', ephemeral: true });
+    // Allowed users check
+    if (!ALLOWED_USERS.has(interaction.user.id)) {
+        return interaction.reply({ content: '🚫 This bot is private.', ephemeral: true });
     }
 
     if (interaction.commandName === 'randomcdn') {
@@ -363,6 +374,149 @@ client.on('interactionCreate', async (interaction) => {
     }
 });
 
+// ─── Prefix command handler ($r34, $random) ───────────────────────────────────
+client.on('messageCreate', async (message) => {
+    if (message.author.bot) return;
+
+    // Allowed users check
+    if (!ALLOWED_USERS.has(message.author.id)) return;
+
+    const content = message.content.trim().toLowerCase();
+
+    // $r34 — same logic as /rule34
+    if (content === '$r34') {
+        let typingInterval;
+        try {
+            typingInterval = setInterval(() => message.channel.sendTyping(), 5000);
+            message.channel.sendTyping();
+
+            const authToken = await getRedgifsToken();
+            let finalGifUrl = null;
+            let fallbackUrl = null;
+            const MAX_ATTEMPTS = 8;
+
+            for (let attempt = 0; attempt < MAX_ATTEMPTS && !finalGifUrl; attempt++) {
+                const tagCount = Math.random() < 0.5 ? 1 : 2;
+                const tags = pickRandomRule34Tag(tagCount);
+                const searchQuery = tags.join(' ');
+                const randomPage = Math.floor(Math.random() * 30) + 1;
+                const order = SORT_ORDERS[Math.floor(Math.random() * SORT_ORDERS.length)];
+
+                try {
+                    console.log(`🔞 [$r34] attempt ${attempt + 1}: "${searchQuery}" | order=${order} | page=${randomPage}`);
+
+                    const response = await axios.get('https://api.redgifs.com/v2/gifs/search', {
+                        headers: { Authorization: `Bearer ${authToken}` },
+                        params: { search_text: searchQuery, count: 30, page: randomPage, order },
+                        timeout: 8000,
+                    });
+
+                    const gifs = response.data?.gifs;
+                    if (!gifs?.length) continue;
+
+                    const shuffled = [...gifs].sort(() => Math.random() - 0.5);
+                    for (const gif of shuffled) {
+                        const url = gif?.urls?.hd ?? gif?.urls?.sd;
+                        if (!url) continue;
+                        if (!recentRule34Set.has(url)) {
+                            finalGifUrl = url;
+                            break;
+                        } else if (!fallbackUrl) {
+                            fallbackUrl = url;
+                        }
+                    }
+                } catch (apiError) {
+                    console.log(`⚠️ [$r34] fetch failed (attempt ${attempt + 1}): ${apiError.message}`);
+                    if (apiError.response?.status === 401) redgifsToken = null;
+                }
+            }
+
+            if (!finalGifUrl && fallbackUrl) finalGifUrl = fallbackUrl;
+            if (!finalGifUrl) throw new Error('No valid GIFs found.');
+
+            recentRule34Set.add(finalGifUrl);
+            recentRule34Queue.push(finalGifUrl);
+            if (recentRule34Queue.length > MAX_RULE34_HISTORY) {
+                recentRule34Set.delete(recentRule34Queue.shift());
+            }
+
+            clearInterval(typingInterval);
+            await message.reply(finalGifUrl);
+
+        } catch (error) {
+            clearInterval(typingInterval);
+            console.error('[$r34] failed:', error.message);
+            await message.reply('❌ Failed to fetch rule34 GIF. Try again!');
+        }
+        return;
+    }
+
+    // $random — same logic as /randomcdn
+    if (content === '$random') {
+        let typingInterval;
+        try {
+            typingInterval = setInterval(() => message.channel.sendTyping(), 5000);
+            message.channel.sendTyping();
+
+            const authToken = await getRedgifsToken();
+            let finalGifUrl = null;
+            let fallbackUrl = null;
+            const MAX_ATTEMPTS = 8;
+
+            for (let attempt = 0; attempt < MAX_ATTEMPTS && !finalGifUrl; attempt++) {
+                const tagCount = Math.random() < 0.6 ? 1 : 2;
+                const tags = pickRandomTags(tagCount);
+                const searchQuery = tags.join(' ');
+                const randomPage = Math.floor(Math.random() * 10) + 1;
+
+                try {
+                    console.log(`🎲 [$random] attempt ${attempt + 1}: "${searchQuery}" (page ${randomPage})`);
+
+                    const response = await axios.get('https://api.redgifs.com/v2/gifs/search', {
+                        headers: { Authorization: `Bearer ${authToken}` },
+                        params: { search_text: searchQuery, count: 30, page: randomPage, order: 'trending' },
+                        timeout: 8000,
+                    });
+
+                    const gifs = response.data?.gifs;
+                    if (!gifs?.length) continue;
+
+                    const shuffled = [...gifs].sort(() => Math.random() - 0.5);
+                    for (const gif of shuffled) {
+                        const url = gif?.urls?.hd ?? gif?.urls?.sd;
+                        if (!url) continue;
+                        if (!recentGifsSet.has(url)) {
+                            finalGifUrl = url;
+                            break;
+                        } else if (!fallbackUrl) {
+                            fallbackUrl = url;
+                        }
+                    }
+                } catch (apiError) {
+                    console.log(`⚠️ [$random] fetch failed (attempt ${attempt + 1}): ${apiError.message}`);
+                    if (apiError.response?.status === 401) redgifsToken = null;
+                }
+            }
+
+            if (!finalGifUrl && fallbackUrl) finalGifUrl = fallbackUrl;
+            if (!finalGifUrl) throw new Error('No valid GIFs found.');
+
+            recentGifsSet.add(finalGifUrl);
+            recentGifsQueue.push(finalGifUrl);
+            if (recentGifsQueue.length > MAX_HISTORY_SIZE) {
+                recentGifsSet.delete(recentGifsQueue.shift());
+            }
+
+            clearInterval(typingInterval);
+            await message.reply(finalGifUrl);
+
+        } catch (error) {
+            clearInterval(typingInterval);
+            console.error('[$random] failed:', error.message);
+            await message.reply('❌ Failed to fetch GIF. Try again!');
+        }
+        return;
+    }
+});
+
 client.login(token);
-
-
