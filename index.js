@@ -5,10 +5,17 @@ const client = new Client({ intents: [IntentsBitField.Flags.Guilds, IntentsBitFi
 
 const token = process.env.token;
 
-// ─── History deduplication ───────────────────────────────────────────────────
-const recentGifsSet = new Set();
+// ─── History deduplication (separate pools per command) ─────────────────────
+const recentGifsSet = new Set();        // /randomcdn pool
 const recentGifsQueue = [];
 const MAX_HISTORY_SIZE = 800;
+
+const recentRule34Set = new Set();      // /rule34 pool (independent)
+const recentRule34Queue = [];
+const MAX_RULE34_HISTORY = 800;
+
+// Sort orders weighted AWAY from trending so popular GIFs don't dominate
+const SORT_ORDERS = ['new', 'new', 'new', 'latest', 'latest', 'top'];
 
 // ─── Redgifs token cache (auto-refreshes, no API key needed) ─────────────────
 let redgifsToken = null;
@@ -110,6 +117,48 @@ const CHAOS_TAGS = [
     'autocorrect fail', 'typo', 'ctrl z', 'undo everything',
     'fresh start', 'do over', 'second chance', 'one more time', 'retry',
 ];
+
+// ─── Rule34-only tag pool ─────────────────────────────────────────────────────
+const RULE34_TAGS = [
+    // Anime series
+    'naruto', 'bleach', 'one piece', 'dragon ball', 'attack on titan',
+    'demon slayer', 'jujutsu kaisen', 'my hero academia', 'sword art online',
+    'fairy tail', 'hunter x hunter', 'fullmetal alchemist', 'overlord',
+    're zero', 'konosuba', 'fate stay night', 'danmachi', 'black clover',
+    'tokyo ghoul', 'death note', 'code geass', 'steins gate',
+
+    // Popular characters / archetypes
+    'tsunade', 'hinata', 'sakura', 'ino', 'temari', 'mikasa', 'erza scarlet',
+    'android 18', 'bulma', 'nami', 'robin', 'hancock', 'nezuko', 'mitsuri',
+    'rem', 'emilia', 'aqua', 'darkness', 'zero two', 'toga himiko',
+    'momo yaoyorozu', 'mirko', 'midnight', 'asuna', 'sinon', 'leafa',
+
+    // Body types / acts (rule34 staples)
+    'futa', 'futanari', 'shemale', 'trap', 'femboy', 'yaoi', 'yuri',
+    'hentai', 'ahegao', 'creampie', 'cumshot', 'blowjob', 'deepthroat',
+    'anal', 'doggystyle', 'cowgirl', 'riding', 'missionary', 'paizuri',
+    'footjob', 'handjob', 'titjob', 'gangbang', 'threesome', 'orgy',
+    'public sex', 'tentacle', 'monster girl', 'elf', 'demon girl',
+
+    // Tags common on rule34 sites
+    'rule34', 'ecchi', 'lewd', 'nude', 'naked', 'topless', 'lingerie',
+    'thong', 'stockings', 'bunny suit', 'maid outfit', 'school uniform',
+    'cat girl', 'fox girl', 'dragon girl', 'succubus', 'angel', 'vampire girl',
+    'big breasts', 'huge breasts', 'small breasts', 'thick thighs', 'wide hips',
+    'big ass', 'spanking', 'bdsm', 'bondage', 'collar', 'leash',
+    'moaning', 'squirt', 'orgasm', 'sex toy', 'vibrator', 'dildo',
+
+    // Specific popular franchises
+    'overwatch', 'genshin impact', 'league of legends', 'final fantasy',
+    'fire emblem', 'zelda', 'metroid', 'street fighter', 'mortal kombat',
+    'pokemon', 'digimon', 'touhou', 'vocaloid', 'kantai collection',
+    'azur lane', 'arknights', 'honkai impact', 'nikke',
+];
+
+function pickRandomRule34Tag(count = 1) {
+    const shuffled = [...RULE34_TAGS].sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, count);
+}
 
 function pickRandomTags(count = 1) {
     const shuffled = [...CHAOS_TAGS].sort(() => Math.random() - 0.5);
@@ -216,6 +265,100 @@ client.on('interactionCreate', async (interaction) => {
         } catch (error) {
             console.error('GIF fetch failed severely:', error.message);
             await interaction.editReply('❌ Failed to fetch GIF. Try again! (Check console for details)');
+        }
+    }
+
+    if (interaction.commandName === 'rule34') {
+        await interaction.deferReply();
+
+        try {
+            const authToken = await getRedgifsToken();
+
+            let finalGifUrl = null;
+            let fallbackUrl = null;
+            const MAX_ATTEMPTS = 8;
+
+            for (let attempt = 0; attempt < MAX_ATTEMPTS && !finalGifUrl; attempt++) {
+                // 50% single tag, 50% two tags — two tags gives more niche results
+                const tagCount = Math.random() < 0.5 ? 1 : 2;
+                const tags = pickRandomRule34Tag(tagCount);
+                const searchQuery = tags.join(' ');
+
+                // Deep page range (1–30) so we never stay stuck on the front page
+                const randomPage = Math.floor(Math.random() * 30) + 1;
+
+                // Heavily weight toward 'new'/'latest' to avoid the same top results
+                const order = SORT_ORDERS[Math.floor(Math.random() * SORT_ORDERS.length)];
+
+                try {
+                    console.log(`🔞 Rule34 attempt ${attempt + 1}: "${searchQuery}" | order=${order} | page=${randomPage}`);
+
+                    const response = await axios.get('https://api.redgifs.com/v2/gifs/search', {
+                        headers: {
+                            Authorization: `Bearer ${authToken}`,
+                        },
+                        params: {
+                            search_text: searchQuery,
+                            count: 30,
+                            page: randomPage,
+                            order,
+                        },
+                        timeout: 8000,
+                    });
+
+                    const gifs = response.data?.gifs;
+                    if (!gifs?.length) {
+                        console.log(`⚠️ No rule34 results for "${searchQuery}" (order=${order}, page=${randomPage})`);
+                        continue;
+                    }
+
+                    // Shuffle so we don't always grab the first result in the page
+                    const shuffled = [...gifs].sort(() => Math.random() - 0.5);
+
+                    for (const gif of shuffled) {
+                        const url = gif?.urls?.hd ?? gif?.urls?.sd;
+                        if (!url) continue;
+
+                        // Use the rule34-specific history set (independent from /randomcdn)
+                        if (!recentRule34Set.has(url)) {
+                            finalGifUrl = url;
+                            console.log(`✅ Found unseen rule34 GIF: ${url}`);
+                            break;
+                        } else if (!fallbackUrl) {
+                            fallbackUrl = url;
+                        }
+                    }
+
+                } catch (apiError) {
+                    console.log(`⚠️ Redgifs fetch failed (rule34 attempt ${attempt + 1}): ${apiError.message}`);
+                    if (apiError.response?.status === 401) {
+                        redgifsToken = null;
+                    }
+                }
+            }
+
+            if (!finalGifUrl && fallbackUrl) {
+                console.log('⚠️ All rule34 GIFs were seen. Using fallback.');
+                finalGifUrl = fallbackUrl;
+            }
+
+            if (!finalGifUrl) {
+                throw new Error('Could not find any valid rule34 GIFs after all attempts.');
+            }
+
+            // Track in the rule34-only history pool
+            recentRule34Set.add(finalGifUrl);
+            recentRule34Queue.push(finalGifUrl);
+            if (recentRule34Queue.length > MAX_RULE34_HISTORY) {
+                const oldest = recentRule34Queue.shift();
+                recentRule34Set.delete(oldest);
+            }
+
+            await interaction.editReply(finalGifUrl);
+
+        } catch (error) {
+            console.error('Rule34 GIF fetch failed severely:', error.message);
+            await interaction.editReply('❌ Failed to fetch rule34 GIF. Try again! (Check console for details)');
         }
     }
 });
