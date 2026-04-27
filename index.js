@@ -24,7 +24,7 @@ const recentCoolSet = new Set();
 const recentCoolQueue = [];
 const MAX_COOL_HISTORY = 800;
 
-// ─── Subreddits that actually still host real .gif files ──────────────────────
+// ─── Subreddits for meme-api (100% GIFs) ─────────────────────────────────────
 const CDN_SUBREDDITS = [
     'reactiongifs', 'HighQualityGifs', 'perfectloops', 'bettereveryloop',
     'catgifs', 'dogegifs', 'AnimalsBeingDerps', 'AnimalsBeingBros',
@@ -33,21 +33,18 @@ const CDN_SUBREDDITS = [
     'animegifs', 'hentai_gifs', 'NSFW_GIF', 'nsfwgif', 'gif',
 ];
 
+// Uses meme-api.com to bypass Reddit's aggressive rate-limiting on Railway
 async function fetchRedditGif(subreddit) {
-    const sort = ['hot', 'new', 'top'][Math.floor(Math.random() * 3)];
-    const t = ['week', 'month', 'all'][Math.floor(Math.random() * 3)];
-    const res = await axios.get(
-        `https://www.reddit.com/r/${subreddit}/${sort}.json?limit=100&t=${t}`,
-        { headers: { 'User-Agent': 'randomgif-bot/1.0' }, timeout: 8000 }
-    );
-    const posts = (res.data?.data?.children ?? []).filter(p => {
-        const u = (p.data?.url ?? '').toLowerCase();
-        return !p.data.is_video && !u.includes('v.redd.it') &&
-            (u.endsWith('.gif') || (u.includes('imgur.com') && u.endsWith('.gif')));
+    const res = await axios.get(`https://meme-api.com/gimme/${subreddit}/50`, {
+        timeout: 8000
     });
-    if (!posts.length) return null;
-    const shuffled = [...posts].sort(() => Math.random() - 0.5);
-    return shuffled[0]?.data?.url ?? null;
+    
+    const posts = res.data?.memes || [];
+    const gifPosts = posts.filter(p => p.url && p.url.toLowerCase().endsWith('.gif'));
+    
+    if (!gifPosts.length) return null;
+    const shuffled = [...gifPosts].sort(() => Math.random() - 0.5);
+    return shuffled[0].url;
 }
 
 // ─── Rule34.xxx tag pool ───────────────────────────────────────────────────────
@@ -72,27 +69,24 @@ function pickRule34Tags(count = 1) {
     return [...RULE34_POOL].sort(() => Math.random() - 0.5).slice(0, count);
 }
 
-// Rule34.xxx — 100% drawn content, forces gif tag for actual GIF files
+// Rule34.xxx — Uses HTTP and Regex to bypass Cloudflare block on Railway
 async function fetchRule34Gif() {
     const tags = pickRule34Tags(1);
-    // 'gif' tag on rule34.xxx specifically means animated .gif files
     const tagString = [...tags, 'gif'].join('+');
     const pid = Math.floor(Math.random() * 30);
 
-    const res = await axios.get('https://rule34.xxx/index.php', {
-        params: { page: 'dapi', s: 'post', q: 'index', json: 1, tags: tagString, limit: 100, pid },
+    const res = await axios.get('http://api.rule34.xxx/index.php', {
+        params: { page: 'dapi', s: 'post', q: 'index', tags: tagString, limit: 100, pid },
         timeout: 10000,
         headers: { 'User-Agent': 'randomgif-bot/1.0' },
     });
 
-    const posts = Array.isArray(res.data) ? res.data : [];
-    if (!posts.length) return null;
+    const matches = [...res.data.matchAll(/file_url="([^"]+\.gif)"/g)];
+    if (!matches.length) return null;
 
-    const gifPosts = posts.filter(p => p.file_url?.toLowerCase().endsWith('.gif'));
-    if (!gifPosts.length) return null;
-
-    const shuffled = [...gifPosts].sort(() => Math.random() - 0.5);
-    return shuffled[0].file_url;
+    const urls = matches.map(m => m[1]);
+    const shuffled = [...urls].sort(() => Math.random() - 0.5);
+    return shuffled[0];
 }
 
 client.on('ready', () => console.log(`✅ Logged in as ${client.user.tag}`));
@@ -115,8 +109,6 @@ client.on('interactionCreate', async (interaction) => {
                     if (url && !recentGifsSet.has(url)) {
                         finalGifUrl = url;
                         console.log(`✅ ${url}`);
-                    } else if (!url) {
-                        console.log(`⚠️ No .gif posts in r/${sub}`);
                     }
                 } catch (e) { console.log(`⚠️ r/${sub} error: ${e.message}`); }
             }
@@ -141,7 +133,7 @@ client.on('interactionCreate', async (interaction) => {
                 console.log(`🔞 Attempt ${attempt + 1}: Rule34.xxx`);
                 try {
                     const url = await fetchRule34Gif();
-                    if (!url) { console.log(`⚠️ No results`); continue; }
+                    if (!url) continue;
                     if (!recentCoolSet.has(url)) {
                         finalGifUrl = url;
                         console.log(`✅ ${url}`);
