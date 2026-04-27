@@ -22,9 +22,9 @@ const recentGifsSet = new Set();        // /randomcdn pool
 const recentGifsQueue = [];
 const MAX_HISTORY_SIZE = 800;
 
-const recentRule34Set = new Set();      // /rule34 pool (independent)
-const recentRule34Queue = [];
-const MAX_RULE34_HISTORY = 800;
+const recentCoolSet = new Set();        // /randomcool pool (independent)
+const recentCoolQueue = [];
+const MAX_COOL_HISTORY = 800;
 
 // Sort orders weighted AWAY from trending so popular GIFs don't dominate
 const SORT_ORDERS = ['new', 'new', 'new', 'latest', 'latest', 'top'];
@@ -107,14 +107,12 @@ const CHAOS_TAGS = [
     'lowkey', 'based', 'sigma', 'gigachad', 'virgin vs chad', 'chad walk',
     'florida man', 'how', 'why', 'what', 'bruh', 'sus', 'rent free',
 
-    // NSFW
-    'hentai', 'ecchi', 'rule34', 'anime nsfw', 'lewd', 'sexy', 'strip',
-    'blowjob', 'anal', 'creampie', 'squirt', 'orgasm', 'moaning', 'thong',
-    'lingerie', 'nude', 'naked', 'boobs', 'ass', 'pussy', 'dick', 'cock',
-    'cumshot', 'facial', 'gangbang', 'threesome', 'milf', 'amateur',
-    'public sex', 'doggystyle', 'missionary', 'cowgirl', 'riding', 'deepthroat',
-    'footjob', 'handjob', 'titjob', 'futa', 'yaoi', 'yuri', 'hentai gif',
-    'nsfw', 'sex', 'porn', 'erotic', 'kinky', 'bdsm',
+    // Cute & fun
+    'cute', 'adorable', 'fluffy', 'tiny', 'wholesome', 'cozy', 'snuggly',
+
+    // Animated / fictional NSFW (no IRL — drawn/anime only)
+    'hentai', 'rule34', 'ecchi', 'futa', 'futanari', 'yaoi', 'yuri',
+    'anime nsfw', 'lewd anime', 'ahegao', 'animated nsfw', 'hentai gif',
 
     // Completely random wildcards
     'bread cat', 'waffle house', 'chuck e cheese', 'furby', 'tamagotchi',
@@ -130,41 +128,57 @@ const CHAOS_TAGS = [
     'fresh start', 'do over', 'second chance', 'one more time', 'retry',
 ];
 
-// ─── Rule34-only tag pool ─────────────────────────────────────────────────────
+// ─── Rule34-only tag pool (ALL fictional/animated — no IRL) ──────────────────
+// Every act/body tag is a compound phrase anchored to "hentai" or "anime"
+// so Redgifs returns drawn/animated content, never IRL porn.
 const RULE34_TAGS = [
-    // Anime series
-    'naruto', 'bleach', 'one piece', 'dragon ball', 'attack on titan',
-    'demon slayer', 'jujutsu kaisen', 'my hero academia', 'sword art online',
-    'fairy tail', 'hunter x hunter', 'fullmetal alchemist', 'overlord',
-    're zero', 'konosuba', 'fate stay night', 'danmachi', 'black clover',
-    'tokyo ghoul', 'death note', 'code geass', 'steins gate',
+    // Anime series (inherently animated)
+    'naruto hentai', 'bleach hentai', 'one piece hentai', 'dragon ball hentai',
+    'attack on titan hentai', 'demon slayer hentai', 'jujutsu kaisen hentai',
+    'my hero academia hentai', 'sword art online hentai', 'fairy tail hentai',
+    'hunter x hunter hentai', 'fullmetal alchemist hentai', 'overlord hentai',
+    're zero hentai', 'konosuba hentai', 'fate stay night hentai',
+    'tokyo ghoul hentai', 'black clover hentai',
 
-    // Popular characters / archetypes
-    'tsunade', 'hinata', 'sakura', 'ino', 'temari', 'mikasa', 'erza scarlet',
-    'android 18', 'bulma', 'nami', 'robin', 'hancock', 'nezuko', 'mitsuri',
-    'rem', 'emilia', 'aqua', 'darkness', 'zero two', 'toga himiko',
-    'momo yaoyorozu', 'mirko', 'midnight', 'asuna', 'sinon', 'leafa',
+    // Popular characters (anchored)
+    'tsunade hentai', 'hinata hentai', 'sakura hentai', 'temari hentai',
+    'mikasa hentai', 'erza scarlet hentai', 'android 18 hentai', 'bulma hentai',
+    'nami hentai', 'robin hentai', 'hancock hentai', 'nezuko hentai',
+    'mitsuri hentai', 'rem hentai', 'zero two hentai', 'toga himiko hentai',
+    'momo yaoyorozu hentai', 'mirko hentai', 'midnight hentai', 'asuna hentai',
 
-    // Body types / acts (rule34 staples)
-    'futa', 'futanari', 'shemale', 'trap', 'femboy', 'yaoi', 'yuri',
-    'hentai', 'ahegao', 'creampie', 'cumshot', 'blowjob', 'deepthroat',
-    'anal', 'doggystyle', 'cowgirl', 'riding', 'missionary', 'paizuri',
-    'footjob', 'handjob', 'titjob', 'gangbang', 'threesome', 'orgy',
-    'public sex', 'tentacle', 'monster girl', 'elf', 'demon girl',
+    // Acts — anchored to hentai/anime so results stay animated
+    'hentai blowjob', 'hentai anal', 'hentai creampie', 'hentai cumshot',
+    'hentai doggystyle', 'hentai cowgirl', 'hentai riding', 'hentai missionary',
+    'hentai deepthroat', 'hentai paizuri', 'hentai footjob', 'hentai handjob',
+    'hentai gangbang', 'hentai threesome', 'hentai orgy', 'hentai squirt',
+    'hentai orgasm', 'hentai bondage', 'hentai bdsm', 'hentai spanking',
+    'hentai sex toy', 'hentai vibrator', 'tentacle hentai',
 
-    // Tags common on rule34 sites
-    'rule34', 'ecchi', 'lewd', 'nude', 'naked', 'topless', 'lingerie',
-    'thong', 'stockings', 'bunny suit', 'maid outfit', 'school uniform',
-    'cat girl', 'fox girl', 'dragon girl', 'succubus', 'angel', 'vampire girl',
-    'big breasts', 'huge breasts', 'small breasts', 'thick thighs', 'wide hips',
-    'big ass', 'spanking', 'bdsm', 'bondage', 'collar', 'leash',
-    'moaning', 'squirt', 'orgasm', 'sex toy', 'vibrator', 'dildo',
+    // Pure animated / drawn style tags
+    'hentai', 'hentai gif', 'anime hentai', 'animated hentai', 'rule34',
+    'ahegao', 'ecchi', 'lewd anime', 'anime nsfw', 'animated nsfw',
 
-    // Specific popular franchises
-    'overwatch', 'genshin impact', 'league of legends', 'final fantasy',
-    'fire emblem', 'zelda', 'metroid', 'street fighter', 'mortal kombat',
-    'pokemon', 'digimon', 'touhou', 'vocaloid', 'kantai collection',
-    'azur lane', 'arknights', 'honkai impact', 'nikke',
+    // Animated character types
+    'futa hentai', 'futanari hentai', 'femboy hentai', 'trap hentai',
+    'yaoi hentai', 'yuri hentai', 'shemale hentai',
+
+    // Animated creature / fantasy types
+    'monster girl hentai', 'elf hentai', 'demon girl hentai', 'succubus hentai',
+    'cat girl hentai', 'fox girl hentai', 'dragon girl hentai',
+    'vampire girl hentai', 'angel hentai',
+
+    // Animated outfits / aesthetics
+    'hentai maid', 'hentai school uniform', 'hentai bunny suit',
+    'hentai lingerie', 'hentai stockings', 'hentai nude', 'hentai topless',
+
+    // Game franchises (anchored)
+    'overwatch hentai', 'genshin impact hentai', 'league of legends hentai',
+    'final fantasy hentai', 'fire emblem hentai', 'zelda hentai',
+    'street fighter hentai', 'mortal kombat hentai', 'pokemon hentai',
+    'touhou hentai', 'vocaloid hentai', 'azur lane hentai',
+    'arknights hentai', 'honkai impact hentai', 'nikke hentai',
+    'kantai collection hentai',
 ];
 
 function pickRandomRule34Tag(count = 1) {
@@ -279,7 +293,7 @@ client.on('interactionCreate', async (interaction) => {
         }
     }
 
-    if (interaction.commandName === 'rule34') {
+    if (interaction.commandName === 'randomcool') {
         await interaction.deferReply();
 
         try {
@@ -290,19 +304,13 @@ client.on('interactionCreate', async (interaction) => {
             const MAX_ATTEMPTS = 8;
 
             for (let attempt = 0; attempt < MAX_ATTEMPTS && !finalGifUrl; attempt++) {
-                // 50% single tag, 50% two tags — two tags gives more niche results
                 const tagCount = Math.random() < 0.5 ? 1 : 2;
                 const tags = pickRandomRule34Tag(tagCount);
                 const searchQuery = tags.join(' ');
-
-                // Deep page range (1–30) so we never stay stuck on the front page
                 const randomPage = Math.floor(Math.random() * 30) + 1;
 
-                // Heavily weight toward 'new'/'latest' to avoid the same top results
-                const order = SORT_ORDERS[Math.floor(Math.random() * SORT_ORDERS.length)];
-
                 try {
-                    console.log(`🔞 Rule34 attempt ${attempt + 1}: "${searchQuery}" | order=${order} | page=${randomPage}`);
+                    console.log(`🔞 Attempt ${attempt + 1}: searching Redgifs for "${searchQuery}" (page ${randomPage})`);
 
                     const response = await axios.get('https://api.redgifs.com/v2/gifs/search', {
                         headers: {
@@ -312,26 +320,25 @@ client.on('interactionCreate', async (interaction) => {
                             search_text: searchQuery,
                             count: 30,
                             page: randomPage,
-                            order,
+                            order: 'trending',
                         },
                         timeout: 8000,
                     });
 
                     const gifs = response.data?.gifs;
                     if (!gifs?.length) {
-                        console.log(`⚠️ No rule34 results for "${searchQuery}" (order=${order}, page=${randomPage})`);
+                        console.log(`⚠️ No results for "${searchQuery}"`);
                         continue;
                     }
 
-                    // Shuffle so we don't always grab the first result in the page
+                    // Shuffle for extra randomness
                     const shuffled = [...gifs].sort(() => Math.random() - 0.5);
 
                     for (const gif of shuffled) {
                         const url = gif?.urls?.hd ?? gif?.urls?.sd;
                         if (!url) continue;
 
-                        // Use the rule34-specific history set (independent from /randomcdn)
-                        if (!recentRule34Set.has(url)) {
+                        if (!recentCoolSet.has(url)) {
                             finalGifUrl = url;
                             console.log(`✅ Found unseen rule34 GIF: ${url}`);
                             break;
@@ -341,15 +348,16 @@ client.on('interactionCreate', async (interaction) => {
                     }
 
                 } catch (apiError) {
-                    console.log(`⚠️ Redgifs fetch failed (rule34 attempt ${attempt + 1}): ${apiError.message}`);
+                    console.log(`⚠️ Redgifs fetch failed (attempt ${attempt + 1}): ${apiError.message}`);
                     if (apiError.response?.status === 401) {
                         redgifsToken = null;
                     }
                 }
             }
 
+            // Use fallback if everything was seen
             if (!finalGifUrl && fallbackUrl) {
-                console.log('⚠️ All rule34 GIFs were seen. Using fallback.');
+                console.log('⚠️ All found rule34 GIFs were seen. Using fallback.');
                 finalGifUrl = fallbackUrl;
             }
 
@@ -357,21 +365,22 @@ client.on('interactionCreate', async (interaction) => {
                 throw new Error('Could not find any valid rule34 GIFs after all attempts.');
             }
 
-            // Track in the rule34-only history pool
-            recentRule34Set.add(finalGifUrl);
-            recentRule34Queue.push(finalGifUrl);
-            if (recentRule34Queue.length > MAX_RULE34_HISTORY) {
-                const oldest = recentRule34Queue.shift();
-                recentRule34Set.delete(oldest);
+            // Track history
+            recentCoolSet.add(finalGifUrl);
+            recentCoolQueue.push(finalGifUrl);
+            if (recentCoolQueue.length > MAX_COOL_HISTORY) {
+                const oldest = recentCoolQueue.shift();
+                recentCoolSet.delete(oldest);
             }
 
             await interaction.editReply(finalGifUrl);
 
         } catch (error) {
-            console.error('Rule34 GIF fetch failed severely:', error.message);
+            console.error('randomcool GIF fetch failed severely:', error.message);
             await interaction.editReply('❌ Failed to fetch rule34 GIF. Try again! (Check console for details)');
         }
     }
+
 });
 
 // ─── Prefix command handler ($r34, $random) ───────────────────────────────────
@@ -383,7 +392,7 @@ client.on('messageCreate', async (message) => {
 
     const content = message.content.trim().toLowerCase();
 
-    // $r34 — same logic as /rule34
+    // $r34 — same logic as /randomcool
     if (content === '$r34') {
         let typingInterval;
         try {
@@ -400,14 +409,13 @@ client.on('messageCreate', async (message) => {
                 const tags = pickRandomRule34Tag(tagCount);
                 const searchQuery = tags.join(' ');
                 const randomPage = Math.floor(Math.random() * 30) + 1;
-                const order = SORT_ORDERS[Math.floor(Math.random() * SORT_ORDERS.length)];
 
                 try {
-                    console.log(`🔞 [$r34] attempt ${attempt + 1}: "${searchQuery}" | order=${order} | page=${randomPage}`);
+                    console.log(`🔞 [$r34] attempt ${attempt + 1}: "${searchQuery}" | page=${randomPage}`);
 
                     const response = await axios.get('https://api.redgifs.com/v2/gifs/search', {
                         headers: { Authorization: `Bearer ${authToken}` },
-                        params: { search_text: searchQuery, count: 30, page: randomPage, order },
+                        params: { search_text: searchQuery, count: 30, page: randomPage, order: 'trending' },
                         timeout: 8000,
                     });
 
@@ -418,7 +426,7 @@ client.on('messageCreate', async (message) => {
                     for (const gif of shuffled) {
                         const url = gif?.urls?.hd ?? gif?.urls?.sd;
                         if (!url) continue;
-                        if (!recentRule34Set.has(url)) {
+                        if (!recentCoolSet.has(url)) {
                             finalGifUrl = url;
                             break;
                         } else if (!fallbackUrl) {
@@ -434,10 +442,10 @@ client.on('messageCreate', async (message) => {
             if (!finalGifUrl && fallbackUrl) finalGifUrl = fallbackUrl;
             if (!finalGifUrl) throw new Error('No valid GIFs found.');
 
-            recentRule34Set.add(finalGifUrl);
-            recentRule34Queue.push(finalGifUrl);
-            if (recentRule34Queue.length > MAX_RULE34_HISTORY) {
-                recentRule34Set.delete(recentRule34Queue.shift());
+            recentCoolSet.add(finalGifUrl);
+            recentCoolQueue.push(finalGifUrl);
+            if (recentCoolQueue.length > MAX_COOL_HISTORY) {
+                recentCoolSet.delete(recentCoolQueue.shift());
             }
 
             clearInterval(typingInterval);
