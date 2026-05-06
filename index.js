@@ -58,18 +58,104 @@ async function fetchTrulyRandomGif(subredditsPool, avoidSet) {
 
 // ─── Rule34/Hentai Subreddits for randomcool ───────────────────────────────────
 const COOL_SUBREDDITS = [
-    'rule34', 'hentai_gif', 'Hentai', 'Overwatch_Porn', 
-    'GenshinImpactHentai', 'tentai', 'futanari', 'yuri',
-    'MonsterGirl', 'Rule34LoL', 'PokePorn', 'ZeldaPorn',
-    'ApexPorn', 'AnimatedPorn', 'SFM_Porn', '3DPorn',
-    'WesternHentai', 'HentaiSource', 'PaladinsPorn', 'NierAutomataPorn',
-    'WitcherPorn', 'FinalFantasyPorn', 'StreetFighterPorn', 'TekkenPorn',
-    'DeadOrAlivePorn', 'SpyxFamilyHentai', 'LeagueOfLegendsPorn', 'ValorantPorn',
-    'Rainbow6Porn', 'FortnitePorn', 'CyberpunkPorn', 'BioShockPorn',
-    'MassEffectPorn', 'TombRaiderPorn', 'ResidentEvilPorn', 'DanganronpaHentai',
-    'PersonaHentai', 'FireEmblemHentai', 'FateHentai', 'AzurLaneHentai',
-    'ArknightsHentai', 'BlueArchiveHentai', 'NikkeMobileHentai', 'HonkaiStarRailHentai',
-    'Hentai_GIFs', 'rule34_gifs', 'AnimeHentaiGifs'
+    // ── Core R34 / General ────────────────────────────────────────────────────
+    'rule34', 'Hentai_GIFs', 'rule34_gifs', 'AnimeHentaiGifs',
+    'hentai_gif', 'Hentai', 'AnimatedPorn', 'WesternHentai',
+    'HentaiSource', 'drawn_hentai', 'ecchi', 'AnimePorn',
+    'HentaiMemes', 'HentaiTrap', 'Sukebe',
+
+    // ── Solo Female (fictional/drawn) ─────────────────────────────────────────
+    'SoloFemale_Hentai', 'solo_hentai', 'HentaiGirls',
+    'AnimeBoobs', 'animebigboobs', 'AnimeButts', 'AnimeFeet',
+    'AnimeThighs', 'HentaiBondage', 'HentaiMilf', 'AnimeGirls',
+    'DrawingsSFM', 'MasturbationHentai', 'HentaiBlowjob',
+
+    // ── Futanari / Femboy / Trap ──────────────────────────────────────────────
+    'futanari', 'Futanari_Hentai', 'AnimeTrap', 'traps',
+    'Femboy', 'FemboyHentai',
+
+    // ── Yuri / Lesbian ────────────────────────────────────────────────────────
+    'yuri', 'YuriHentai', 'GirlsLoveHentai',
+
+    // ── Monster / Fantasy ─────────────────────────────────────────────────────
+    'MonsterGirl', 'MonsterGirlHentai', 'tentai',
+    'TentacleHentai', 'OrcPorn', 'ElvesAndSexElves',
+
+    // ── SFM / 3D Animated ─────────────────────────────────────────────────────
+    'SFM_Porn', '3DPorn', 'SFMporn', 'SFMNSFW',
+    'Blender_Porn', '3DAnimatedPorn', 'SFM_Rule34',
+
+    // ── Overwatch ─────────────────────────────────────────────────────────────
+    'Overwatch_Porn', 'OverwatchTracer', 'OverwatchMercyPorn',
+    'OverwatchD_Va', 'OverwatchWidowmaker',
+
+    // ── Genshin Impact ───────────────────────────────────────────────────────
+    'GenshinImpactHentai', 'GenshinImpactNSFW', 'GenshinHentai',
+    'GenshinRule34', 'HuTaoHentai', 'GanyuHentai', 'RaidenShogunHentai',
+
+    // ── League of Legends / Valorant ─────────────────────────────────────────
+    'Rule34LoL', 'LeagueOfLegendsPorn', 'ValorantPorn',
+    'LoLHentai', 'AhriHentai', 'JinxHentai',
+
+    // ── Pokémon ───────────────────────────────────────────────────────────────
+    'PokePorn', 'PokemonNSFW', 'Pokemon_Hentai', 'PokemonRule34',
+    'PokemonGirlsNSFW',
+
+    // ── Zelda ─────────────────────────────────────────────────────────────────
+    'ZeldaPorn', 'ZeldaHentai', 'ZeldaRule34',
+
+    // ── Final Fantasy ─────────────────────────────────────────────────────────
+    'FinalFantasyPorn', 'FinalFantasyHentai', 'FF14Porn',
+
+    // ── Fate ─────────────────────────────────────────────────────────────────
+    'FateHentai', 'FateStayNightHentai', 'FateGrandOrderNSFW',
+
+    // ── Anime-specific Fandoms ────────────────────────────────────────────────
+    'NierAutomataPorn', '2BHentai',
+    'SpyxFamilyHentai', 'AniFamilyHentai',
+    'DemonSlayerHentai', 'DemonSlayer_NSFW',
+    'NarutoHentai', 'NarutoRule34',
+    'DragonBallHentai', 'DragonBallZPorn',
+    'OnePunchManNSFW', 'MyHeroAcademiaHentai', 'BnhaHentai',
+    'AttackOnTitanHentai', 'SnkHentai',
+    'JujutsuKaisenHentai', 'JJKHentai',
+    'HunterXHunterNSFW', 'ChainsawManHentai',
+    'SteinsGateHentai', 'TokyoRevengersHentai',
+    'RecordOfRagnarokNSFW', 'TengenToppaHentai',
+    'KonosubaHentai', 'RimworldHentai',
+
+    // ── Gacha / Mobile Games ─────────────────────────────────────────────────
+    'AzurLaneHentai', 'AzurLane_NSFW',
+    'ArknightsHentai', 'Arknights_NSFW',
+    'BlueArchiveHentai', 'BlueArchiveNSFW',
+    'NikkeMobileHentai', 'NIKKERule34',
+    'HonkaiStarRailHentai', 'HonkaiStarRailNSFW',
+    'HonkaiImpact3Hentai', 'FGOHentai',
+
+    // ── FPS / Shooter Games ───────────────────────────────────────────────────
+    'ApexPorn', 'FortnitePorn', 'ValorantPorn',
+    'Rainbow6Porn', 'CallOfDutyPorn', 'HaloNSFW',
+
+    // ── Fighting Games ────────────────────────────────────────────────────────
+    'StreetFighterPorn', 'TekkenPorn', 'DeadOrAlivePorn',
+    'GuiltyGearPorn', 'MortalKombatPorn',
+
+    // ── RPG / Action Games ────────────────────────────────────────────────────
+    'CyberpunkPorn', 'BioShockPorn', 'MassEffectPorn',
+    'TombRaiderPorn', 'ResidentEvilPorn', 'WitcherPorn',
+    'EldenRingNSFW', 'DarkSoulsNSFW', 'SkyrimPorn',
+    'PersonaHentai', 'FireEmblemHentai', 'DanganronpaHentai',
+
+    // ── Western Animation / Comics ────────────────────────────────────────────
+    'WesternHentai', 'WesternAnimated_R34',
+    'TotallySpiesPorn', 'FairlyOddParentsPorn',
+    'AvatarPorn', 'GravityFallsPorn',
+    'MiraculousLadybugHentai', 'StarVsNSFW',
+    'StevenUniverseNSFW', 'AmericanDadPorn',
+
+    // ── Misc Drawn / Illustrated ──────────────────────────────────────────────
+    'HentaiSource', 'PaladinsPorn', 'HentaiBondage',
+    'TwistedWonderlandNSFW', 'FemboyHentai',
 ];
 
 client.on('ready', () => console.log(`✅ Logged in as ${client.user.tag}`));
